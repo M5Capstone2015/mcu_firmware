@@ -85,8 +85,8 @@ void send_byte(uint32_t byte)
 	entered_send_byte++;
 	int i, temp;
 	send_bit(2);
-//	mappedByte = mappingFunction(byte);
-	mappedByte = mappFunction_tmp(byte);
+	mappedByte = mappingFunction(byte);
+//	mappedByte = mappFunction_tmp(byte);
 	for(i = 7; i > -1; i--) {
 		temp = mappedByte >> i;
 //		temp = byte >> i;

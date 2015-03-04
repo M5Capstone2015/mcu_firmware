@@ -30,9 +30,11 @@
 #include "iocontrols.h"
 #include "em_int.h"
 
+
 #define LED1_INDEX  13
 #define LED2_INDEX  5
-
+#define COEF_OLD 99
+#define COEF_NEW (100-COEF_OLD)
 volatile uint32_t msTicks; // counts 1ms timeTicks
 
 void Delay(uint32_t dlyTicks);
@@ -44,9 +46,13 @@ char transmitBuffer[] = "TEST";
 
 //#define            BUFFERSIZE    (sizeof(transmitBuffer) / sizeof(char))
 #define BUFFERSIZE 	17
+#define WINDOW_SIZE 50
+
 char receiveBuffer[BUFFERSIZE];
-char receiveBuffer2[BUFFERSIZE];
 char bit_ready2[BUFFERSIZE];
+int led1_ac_buffer[WINDOW_SIZE];
+int led2_ac_buffer[WINDOW_SIZE];
+
 
 int spo2 = 1;
 
@@ -55,9 +61,15 @@ char* bit_readyptr;
 
 volatile int got_afe_ready = 0;
 volatile int entered_gpio_callback = 0;
-volatile int led1_val = 0;
-volatile int led2_val = 0;
+volatile int led1_ac = 0;
+volatile int led2_ac = 0;
+volatile int max1 = 0;
+volatile int min1 = 0;
+volatile int mean1 = 0;
 
+volatile int max2 = 0;
+volatile int min2 = 0;
+volatile int mean2 = 0;
 /*************************v*************************************************//**
  * @brief SysTick_Handler
  * Interrupt Service Routine for system tick counter
@@ -169,6 +181,72 @@ int read_byte(int index) {
 	while(bit_ready2[index] == 0);
 	bit_ready2[index] = 0;
 	return receiveBuffer[index];
+
+}
+
+int calculate_mean(int *buffer, int size) {
+	int i;
+	int32_t sum = 0;
+	for(i=0; i<size; i++) {
+		sum += buffer[i];
+	}
+	return (int)(sum/size);
+}
+
+int find_max(int *buffer, int size) {
+	int cur_max = 0;
+	int i;
+	for(i=0; i < size; i++) {
+		if(buffer[i] > cur_max) {
+			cur_max = buffer[i];
+		}
+	}
+	return cur_max;
+}
+
+int find_min(int *buffer, int size) {
+	int cur_min = buffer[0];
+	int i;
+	for(i=0; i < size; i++) {
+		if(buffer[i] < cur_min) {
+			cur_min = buffer[i];
+		}
+	}
+	return cur_min;
+}
+void add_to_buffer(int *buffer, int val, int i, int or12) {
+		if(or12 == 1) {
+			if(buffer[i] == max1) {
+				//need to calculate new max
+				buffer[i] = val;
+				max1 = find_max(buffer, WINDOW_SIZE);
+			}
+			if(buffer[i] == min1) {
+				buffer[i] = val;
+				min1 = find_min(buffer, WINDOW_SIZE);
+			}
+		}
+		if(or12 == 2) {
+			if(buffer[i] == max2) {
+				//need to calculate new max
+				buffer[i] = val;
+				max2 = find_max(buffer, WINDOW_SIZE);
+			}
+			else if(buffer[i] == min2) {
+				buffer[i] = val;
+				min2 = find_min(buffer, WINDOW_SIZE);
+			}
+		}
+
+
+	buffer[i] = val;
+
+	if(or12 == 1) {
+		mean1 = calculate_mean(buffer, WINDOW_SIZE);
+	}
+	if(or12 == 2) {
+		mean2 = calculate_mean(buffer, WINDOW_SIZE);
+	}
 
 }
 
@@ -285,15 +363,16 @@ int main(void)
   spo2 = 965;
   int tmp[3] = {0};
   int i = 0;
-  int count = 0;
+  int index = 0;
   while (1)
   {
 
 //	  send_byte(spo2);
 
 	  	 if( (entered_gpio_callback = 1)) {
-	  		 led2_val = 0;
-	  		 led1_val = 0;
+	  		entered_gpio_callback = 0;
+	  		 led2_ac = 0;
+	  		 led1_ac = 0;
 	  		slaveRxBufferIndex = 0;
 
 	  		 read_data();
@@ -302,29 +381,33 @@ int main(void)
 	  			 tmp[i-LED2_INDEX] = read_byte(i);
 	  		 }
 
-	  		 led2_val = (tmp[0] << 16);
-	  		 led2_val |= (tmp[1] << 8);
-	  		 led2_val |= tmp[2];
+	  		 led2_ac = (tmp[0] << 16);
+	  		 led2_ac |= (tmp[1] << 8);
+	  		 led2_ac |= tmp[2];
 
 	  		 for(i = LED1_INDEX; i < (LED1_INDEX+3); i++) {
 	  		 		 tmp[i-LED1_INDEX] = read_byte(i);
 	  		 }
-	  		 led1_val = (tmp[0] << 16);
-	  		 led1_val |= (tmp[1] << 8);
-	  		 led1_val |= tmp[2];
+	  		 led1_ac = (tmp[0] << 16);
+	  		 led1_ac |= (tmp[1] << 8);
+	  		 led1_ac |= tmp[2];
 
-	  		 spo2 = 1000*led2_val/led1_val;
+	  		add_to_buffer(led1_ac_buffer, led1_ac, index, 1);
+	  		add_to_buffer(led2_ac_buffer, led1_ac, index, 2);
 
+	  		if(index > WINDOW_SIZE) {
+	  			index = 0;
+	  		} else {
+	  			index++;
+	  		}
+
+	  		spo2 = (1000*((1000*(max1-min1))/mean1))/((1000*(max2-min2))/mean2);
 
   			 send_byte(spo2);
 
-/*
-	  		 for(i = 0; i < 200; i++) {
-	  			 send_byte(spo2);
-	  		 }*/
-//	  		 send_byte(spo2);
+
 	  		 entered_gpio_callback = 0;
-//	  		 count++;
+	  		 Delay(10);
 	  	 }
 
   }
