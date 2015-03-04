@@ -46,13 +46,14 @@ char transmitBuffer[] = "TEST";
 
 //#define            BUFFERSIZE    (sizeof(transmitBuffer) / sizeof(char))
 #define BUFFERSIZE 	17
-#define WINDOW_SIZE 50
+#define WINDOW_SIZE 100
 
 char receiveBuffer[BUFFERSIZE];
 char bit_ready2[BUFFERSIZE];
 int led1_ac_buffer[WINDOW_SIZE];
 int led2_ac_buffer[WINDOW_SIZE];
-
+int spo2_buffer[WINDOW_SIZE];
+int spo2_calibrated = 0;
 
 int spo2 = 1;
 
@@ -63,6 +64,7 @@ volatile int got_afe_ready = 0;
 volatile int entered_gpio_callback = 0;
 volatile int led1_ac = 0;
 volatile int led2_ac = 0;
+
 volatile int max1 = 0;
 volatile int min1 = 0;
 volatile int mean1 = 0;
@@ -70,6 +72,8 @@ volatile int mean1 = 0;
 volatile int max2 = 0;
 volatile int min2 = 0;
 volatile int mean2 = 0;
+
+int spo2_mean = 0;
 /*************************v*************************************************//**
  * @brief SysTick_Handler
  * Interrupt Service Routine for system tick counter
@@ -236,6 +240,9 @@ void add_to_buffer(int *buffer, int val, int i, int or12) {
 				buffer[i] = val;
 				min2 = find_min(buffer, WINDOW_SIZE);
 			}
+//		if(or12 == 3){
+//				buffer[i] = val;
+//			}
 		}
 
 
@@ -392,22 +399,37 @@ int main(void)
 	  		 led1_ac |= (tmp[1] << 8);
 	  		 led1_ac |= tmp[2];
 
-	  		add_to_buffer(led1_ac_buffer, led1_ac, index, 1);
-	  		add_to_buffer(led2_ac_buffer, led1_ac, index, 2);
 
+	  		if (led1_ac > 10000){
+	  			send_byte(750);
+	  			entered_gpio_callback = 0;
+	  		}
+	  		else{
+	  		add_to_buffer(led1_ac_buffer, led1_ac, index, 1);
+	  		add_to_buffer(led2_ac_buffer, led2_ac, index, 2);
+	  		add_to_buffer(spo2_buffer, spo2, index, 3);
 	  		if(index > WINDOW_SIZE) {
 	  			index = 0;
 	  		} else {
 	  			index++;
 	  		}
+	  		max1 = find_max(led1_ac_buffer, WINDOW_SIZE);
+	  		min1 = find_min(led1_ac_buffer, WINDOW_SIZE);
+	  		spo2 = (1000*((1000*(max2-min2))/mean2))/((1000*(max1-min1))/mean1);
 
-	  		spo2 = (1000*((1000*(max1-min1))/mean1))/((1000*(max2-min2))/mean2);
+//Need to calibrate for probe:
+//http://www.mdpi.com/1424-8220/14/4/7420
+//https://www.wpi.edu/Pubs/E-project/Available/E-project-042811-152156/unrestricted/Pulse_Oximeter_Calibrator.pdf
 
-  			 send_byte(spo2);
-
+	  		spo2_mean = calculate_mean(spo2_buffer,WINDOW_SIZE);
+	  		spo2_calibrated = (1000000 - 25*spo2_mean)/1000;
+//	  		for (int i = 0; i <30;i++){
+  			send_byte(spo2_calibrated);
+//	  		}
 
 	  		 entered_gpio_callback = 0;
-	  		 Delay(10);
+	  		 Delay(15);
+	  	 }
 	  	 }
 
   }
