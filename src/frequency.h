@@ -15,6 +15,8 @@
 uint32_t mappedByte = 0;
 int byte_array[8];
 
+int mapped_buffer[100];
+int mappedIndex = 0;
 /**************************************************************************//**
  * @brief Toggles io with a set delay time a number of times
  * @param delayTime - delay times in Milliseconds (period will be twice this number), repetitions
@@ -67,10 +69,10 @@ void toBitArray(int a,int* output){
 
 int mappingFunction(int a){
 	int mappedOutput;
-	if (a <= 750 || a >= 1000)
+	if (a <= 70 || a >= 120)
 		mappedOutput = 0;
     else
-    	mappedOutput = a - 750;
+    	mappedOutput = a - 70;
 	return mappedOutput;
 }
 
@@ -80,16 +82,31 @@ int mappFunction_tmp(int a) {
 	return tmp;
 }
 int entered_send_byte = 0;
-void send_byte(uint32_t byte)
+void send_byte(uint32_t byte, int type)
 {
 	entered_send_byte++;
 	int i, temp;
 	send_bit(2);
 	mappedByte = mappingFunction(byte);
+	mapped_buffer[mappedIndex] = mappedByte;
+	if(mappedIndex >= 99) {
+		mappedIndex = 0;
+	}
+	else { mappedIndex++; }
+	// Sending spo2 value
+	if(type == 0){
+		send_bit(0);
+	}
+
+	// Sending BPS
+	if(type == 1){
+		send_bit(1);
+	}
+	byte = 15;
 //	mappedByte = mappFunction_tmp(byte);
 	for(i = 7; i > -1; i--) {
-		temp = mappedByte >> i;
-//		temp = byte >> i;
+//		temp = mappedByte >> i;
+		temp = byte >> i;
 		temp &= 0x1;
 		byte_array[i] = temp;
 		send_bit(temp);

@@ -29,6 +29,7 @@
 #include "frequency.h"
 #include "iocontrols.h"
 #include "em_int.h"
+#include <math.h>
 
 
 #define LED1_INDEX  13
@@ -46,14 +47,17 @@ char transmitBuffer[] = "TEST";
 
 //#define            BUFFERSIZE    (sizeof(transmitBuffer) / sizeof(char))
 #define BUFFERSIZE 	17
-#define WINDOW_SIZE 50
+#define WINDOW_SIZE 100
 
 char receiveBuffer[BUFFERSIZE];
 char bit_ready2[BUFFERSIZE];
 int led1_ac_buffer[WINDOW_SIZE];
 int led2_ac_buffer[WINDOW_SIZE];
+int spo2_buffer[WINDOW_SIZE];
+int spo2_calibrated = 0;
 
-
+int led1_amb_buffer[WINDOW_SIZE];
+int led2_amb_buffer[WINDOW_SIZE];
 int spo2 = 1;
 
 int bitz[3] = {0};
@@ -63,6 +67,7 @@ volatile int got_afe_ready = 0;
 volatile int entered_gpio_callback = 0;
 volatile int led1_ac = 0;
 volatile int led2_ac = 0;
+
 volatile int max1 = 0;
 volatile int min1 = 0;
 volatile int mean1 = 0;
@@ -70,6 +75,8 @@ volatile int mean1 = 0;
 volatile int max2 = 0;
 volatile int min2 = 0;
 volatile int mean2 = 0;
+
+int spo2_mean = 0;
 /*************************v*************************************************//**
  * @brief SysTick_Handler
  * Interrupt Service Routine for system tick counter
@@ -214,6 +221,14 @@ int find_min(int *buffer, int size) {
 	}
 	return cur_min;
 }
+int lookup(int r_value) {
+	if(r_value < 849) { return 100; }
+	if(r_value < 949) { return 99; }
+	if(r_value < 1049) { return 98; }
+	if(r_value < 1149) { return 97; }
+	if(r_value < 1249) { return 97; }
+
+}
 void add_to_buffer(int *buffer, int val, int i, int or12) {
 		if(or12 == 1) {
 			if(buffer[i] == max1) {
@@ -236,6 +251,9 @@ void add_to_buffer(int *buffer, int val, int i, int or12) {
 				buffer[i] = val;
 				min2 = find_min(buffer, WINDOW_SIZE);
 			}
+//		if(or12 == 3){
+//				buffer[i] = val;
+//			}
 		}
 
 
@@ -364,10 +382,9 @@ int main(void)
   int tmp[3] = {0};
   int i = 0;
   int index = 0;
+  int r_value;
   while (1)
   {
-
-//	  send_byte(spo2);
 
 	  	 if( (entered_gpio_callback = 1)) {
 	  		entered_gpio_callback = 0;
@@ -385,6 +402,7 @@ int main(void)
 	  		 led2_ac |= (tmp[1] << 8);
 	  		 led2_ac |= tmp[2];
 
+
 	  		 for(i = LED1_INDEX; i < (LED1_INDEX+3); i++) {
 	  		 		 tmp[i-LED1_INDEX] = read_byte(i);
 	  		 }
@@ -392,23 +410,47 @@ int main(void)
 	  		 led1_ac |= (tmp[1] << 8);
 	  		 led1_ac |= tmp[2];
 
+
+//	  		if (led1_ac > 10000){
+//	  			send_byte(750);
+//	  			entered_gpio_callback = 0;
+//	  		}
+//	  		else{
 	  		add_to_buffer(led1_ac_buffer, led1_ac, index, 1);
-	  		add_to_buffer(led2_ac_buffer, led1_ac, index, 2);
+	  		add_to_buffer(led2_ac_buffer, led2_ac, index, 2);
+
+//	  		max1 = find_max(led1_ac_buffer, WINDOW_SIZE);
+	  		min1 = find_min(led1_ac_buffer, WINDOW_SIZE);
+	  		min2 = find_min(led2_ac_buffer, WINDOW_SIZE);
+
+//Need to calibrate for probe:
+//http://www.mdpi.com/1424-8220/14/4/7420
+//https://www.wpi.edu/Pubs/E-project/Available/E-project-042811-152156/unrestricted/Pulse_Oximeter_Calibrator.pdf
+
+	  		r_value = (1000*(1000*led2_ac/min2)/(1000*led1_ac/min1))/10;
+//	  		spo2 = lookup(r_value);
+//	  		add_to_buffer(spo2_buffer, r_value, index, 3);
 
 	  		if(index > WINDOW_SIZE) {
 	  			index = 0;
 	  		} else {
 	  			index++;
 	  		}
+//	  		spo2_mean = calculate_mean(spo2_buffer,WINDOW_SIZE);
+//	  		spo2_calibrated = (1000000 - 25*spo2_mean)/1000;
+//	  		for (int i = 0; i <30;i++){
 
-	  		spo2 = (1000*((1000*(max1-min1))/mean1))/((1000*(max2-min2))/mean2);
+	  		add_to_buffer(spo2_buffer, 85, index, 3);
 
-  			 send_byte(spo2);
 
+//	  		send_byte(r_value, 0);
+	  		send_byte(85, 0);
+//	  		}
 
 	  		 entered_gpio_callback = 0;
-	  		 Delay(10);
+	  		 Delay(15);
 	  	 }
+//	  	 }
 
   }
 }
