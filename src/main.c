@@ -56,8 +56,11 @@ int led2_ac_buffer[WINDOW_SIZE];
 int spo2_buffer[WINDOW_SIZE];
 int spo2_calibrated = 0;
 
+<<<<<<< HEAD
 int led1_amb_buffer[WINDOW_SIZE];
 int led2_amb_buffer[WINDOW_SIZE];
+=======
+>>>>>>> 864e651c698bcabc8b26a6f59082c973d2b37c0a
 int spo2 = 1;
 
 int bitz[3] = {0};
@@ -410,6 +413,7 @@ int main(void)
 	  		 led1_ac |= (tmp[1] << 8);
 	  		 led1_ac |= tmp[2];
 
+<<<<<<< HEAD
 
 //	  		if (led1_ac > 10000){
 //	  			send_byte(750);
@@ -430,12 +434,23 @@ int main(void)
 	  		r_value = (1000*(1000*led2_ac/min2)/(1000*led1_ac/min1))/10;
 //	  		spo2 = lookup(r_value);
 //	  		add_to_buffer(spo2_buffer, r_value, index, 3);
+=======
+>>>>>>> 864e651c698bcabc8b26a6f59082c973d2b37c0a
 
+	  		if (led1_ac > 10000){
+	  			send_byte(750);
+	  			entered_gpio_callback = 0;
+	  		}
+	  		else{
+	  		add_to_buffer(led1_ac_buffer, led1_ac, index, 1);
+	  		add_to_buffer(led2_ac_buffer, led2_ac, index, 2);
+	  		add_to_buffer(spo2_buffer, spo2, index, 3);
 	  		if(index > WINDOW_SIZE) {
 	  			index = 0;
 	  		} else {
 	  			index++;
 	  		}
+<<<<<<< HEAD
 //	  		spo2_mean = calculate_mean(spo2_buffer,WINDOW_SIZE);
 //	  		spo2_calibrated = (1000000 - 25*spo2_mean)/1000;
 //	  		for (int i = 0; i <30;i++){
@@ -445,10 +460,28 @@ int main(void)
 
 //	  		send_byte(r_value, 0);
 	  		send_byte(85, 0);
+=======
+	  		max1 = find_max(led1_ac_buffer, WINDOW_SIZE);
+	  		min1 = find_min(led1_ac_buffer, WINDOW_SIZE);
+	  		spo2 = (1000*((1000*(max2-min2))/mean2))/((1000*(max1-min1))/mean1);
+
+//Need to calibrate for probe:
+//http://www.mdpi.com/1424-8220/14/4/7420
+//https://www.wpi.edu/Pubs/E-project/Available/E-project-042811-152156/unrestricted/Pulse_Oximeter_Calibrator.pdf
+
+	  		spo2_mean = calculate_mean(spo2_buffer,WINDOW_SIZE);
+	  		spo2_calibrated = (1000000 - 25*spo2_mean)/1000;
+//	  		for (int i = 0; i <30;i++){
+  			send_byte(spo2_calibrated);
+>>>>>>> 864e651c698bcabc8b26a6f59082c973d2b37c0a
 //	  		}
 
 	  		 entered_gpio_callback = 0;
 	  		 Delay(15);
+<<<<<<< HEAD
+=======
+	  	 }
+>>>>>>> 864e651c698bcabc8b26a6f59082c973d2b37c0a
 	  	 }
 //	  	 }
 
