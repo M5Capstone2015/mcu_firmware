@@ -102,11 +102,10 @@ void send_byte(uint32_t byte, int type)
 	if(type == 1){
 		send_bit(1);
 	}
-	byte = 15;
-//	mappedByte = mappFunction_tmp(byte);
+
 	for(i = 7; i > -1; i--) {
-//		temp = mappedByte >> i;
-		temp = byte >> i;
+		temp = mappedByte >> i;
+//		temp = byte >> i;
 		temp &= 0x1;
 		byte_array[i] = temp;
 		send_bit(temp);
