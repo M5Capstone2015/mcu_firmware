@@ -1,2 +1,3 @@
 # mcu_spi
-bits and shit
+
+code to be run on mcu
