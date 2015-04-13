@@ -51,32 +51,32 @@ char transmitBuffer[] = "TEST";
 
 char receiveBuffer[BUFFERSIZE];
 char bit_ready2[BUFFERSIZE];
-int led1_ac_buffer[WINDOW_SIZE];
-int led2_ac_buffer[WINDOW_SIZE];
-int spo2_buffer[WINDOW_SIZE];
+uint32_t  led1_ac_buffer[WINDOW_SIZE];
+uint32_t  led2_ac_buffer[WINDOW_SIZE];
+uint32_t  r_value_buffer[WINDOW_SIZE];
+uint32_t  ave_r_value[WINDOW_SIZE];
+uint32_t  bpm_buffer[WINDOW_SIZE];
 int spo2_calibrated = 0;
 
-int led1_amb_buffer[WINDOW_SIZE];
-int led2_amb_buffer[WINDOW_SIZE];
-int spo2 = 1;
+uint32_t  spo2 = 1;
 
 int bitz[3] = {0};
 char* bit_readyptr;
 
 volatile int got_afe_ready = 0;
 volatile int entered_gpio_callback = 0;
-volatile int led1_ac = 0;
-volatile int led2_ac = 0;
+volatile uint32_t  led1_ac = 0;
+volatile uint32_t led2_ac = 0;
+volatile uint32_t  min1 = 0;
+volatile uint32_t  min2 = 0;
 
-volatile int max1 = 0;
-volatile int min1 = 0;
-volatile int mean1 = 0;
+volatile uint32_t  mean1 = 0;
+volatile uint32_t  mean2 = 0;
 
-volatile int max2 = 0;
-volatile int min2 = 0;
-volatile int mean2 = 0;
+volatile uint32_t  max1 = 0;
+volatile uint32_t  max2 = 0;
 
-int spo2_mean = 0;
+
 /*************************v*************************************************//**
  * @brief SysTick_Handler
  * Interrupt Service Routine for system tick counter
@@ -191,7 +191,7 @@ int read_byte(int index) {
 
 }
 
-int calculate_mean(int *buffer, int size) {
+int calculate_mean(uint32_t *buffer, int size) {
 	int i;
 	int32_t sum = 0;
 	for(i=0; i<size; i++) {
@@ -200,8 +200,8 @@ int calculate_mean(int *buffer, int size) {
 	return (int)(sum/size);
 }
 
-int find_max(int *buffer, int size) {
-	int cur_max = 0;
+uint32_t  find_max(uint32_t *buffer, int size) {
+	uint32_t cur_max = 0;
 	int i;
 	for(i=0; i < size; i++) {
 		if(buffer[i] > cur_max) {
@@ -211,8 +211,8 @@ int find_max(int *buffer, int size) {
 	return cur_max;
 }
 
-int find_min(int *buffer, int size) {
-	int cur_min = buffer[0];
+uint32_t find_min(uint32_t  *buffer, int size) {
+	uint32_t cur_min = buffer[0];
 	int i;
 	for(i=0; i < size; i++) {
 		if(buffer[i] < cur_min) {
@@ -228,8 +228,35 @@ int lookup(int r_value) {
 	if(r_value < 1149) { return 97; }
 	if(r_value < 1249) { return 97; }
 
+	return -1;
+
 }
-void add_to_buffer(int *buffer, int val, int i, int or12) {
+
+int find_bpm(uint32_t *buffer, int deriv, int index) {
+	int j, cnt = 0;
+	// This means that the previous derivative was positve and we should look for a peak
+	if(deriv == 0) {
+		for(j = 0; j < 5; j++) {
+			if(buffer[index-(j+1)] < buffer[index-j]) {
+				cnt++;
+			}
+		}
+
+		if(cnt == 4) { return -1; }
+	}
+
+	// This means the slope is decreasing
+	if(deriv == -1) {
+		for(j = 0; j < 5; j++) {
+			if(buffer[index-(j+1)] < buffer[index-j]) {
+				cnt++;
+			}
+		}
+		if(cnt == 4) { return 0; }
+	}
+	return deriv;
+}
+void add_to_buffer(uint32_t  *buffer, uint32_t  val, int i, int or12) {
 		if(or12 == 1) {
 			if(buffer[i] == max1) {
 				//need to calculate new max
@@ -379,10 +406,11 @@ int main(void)
   BSP_PinsInit();
   // Infinite blink loop
   spo2 = 965;
-  int tmp[3] = {0};
-  int i = 0;
-  int index = 0;
-  int r_value;
+  uint32_t tmp[3] = {0};
+  int i = 0, new_deriv;
+  int index = 0, bpm_index = 0, samples = 0;
+  int deriv = 0, sum;
+  uint32_t r_value;
   while (1)
   {
 
@@ -419,6 +447,8 @@ int main(void)
 	  		add_to_buffer(led1_ac_buffer, led1_ac, index, 1);
 	  		add_to_buffer(led2_ac_buffer, led2_ac, index, 2);
 
+//	  		 led1_ac_buffer[index] = led1_ac;
+//	  		 led2_ac_buffer[index] = led2_ac;
 //	  		max1 = find_max(led1_ac_buffer, WINDOW_SIZE);
 	  		min1 = find_min(led1_ac_buffer, WINDOW_SIZE);
 	  		min2 = find_min(led2_ac_buffer, WINDOW_SIZE);
@@ -428,19 +458,46 @@ int main(void)
 //https://www.wpi.edu/Pubs/E-project/Available/E-project-042811-152156/unrestricted/Pulse_Oximeter_Calibrator.pdf
 
 	  		r_value = (1000*(1000*led2_ac/min2)/(1000*led1_ac/min1))/10;
-//	  		spo2 = lookup(r_value);
-//	  		add_to_buffer(spo2_buffer, r_value, index, 3);
+	  		r_value_buffer[index] = r_value;
 
-	  		if(index > WINDOW_SIZE) {
+//	  		add_to_buffer(r_value_buffer, r_value, index, 3);
+	  		sum = 0;
+	  		for(i = 0; i < 10; i++) {
+	  			if((index-i) < 0) {
+	  				sum += r_value_buffer[WINDOW_SIZE-i];
+	  			} else {
+	  				sum += r_value_buffer[index-i];
+	  			}
+	  		}
+	  		ave_r_value[index] = (1000 * sum) / 100;
+
+
+	  		if(index >= WINDOW_SIZE) {
 	  			index = 0;
 	  		} else {
 	  			index++;
 	  		}
-//	  		spo2_mean = calculate_mean(spo2_buffer,WINDOW_SIZE);
+
+/*	  		new_deriv = find_bpm(led2_ac_buffer, deriv, index);
+	  		if((deriv == 0) && (new_deriv == -1)) {
+	  			bpm_buffer[bpm_index] = samples;
+	  			samples = 0;
+	  			if(bpm_index >= WINDOW_SIZE) {
+	  				bpm_index = 0;
+	  			} else {
+	  				bpm_index++;
+	  			}
+
+	  		} else {
+	  			samples++;
+	  		}
+	  		deriv = new_deriv;
+*/
+//	  		spo2_mean = calculate_mean(r_value_buffer,WINDOW_SIZE);
 //	  		spo2_calibrated = (1000000 - 25*spo2_mean)/1000;
 //	  		for (int i = 0; i <30;i++){
 
-	  		add_to_buffer(spo2_buffer, r_value, index, 3);
+
 
 
 //	  		send_byte(r_value, 0);

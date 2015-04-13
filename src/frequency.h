@@ -67,12 +67,12 @@ void toBitArray(int a,int* output){
 	}
 }
 
-int mappingFunction(int a){
+int mappingFunction(uint32_t a){
 	int mappedOutput;
-	if (a <= 70 || a >= 120)
+	if (a <= 700 || a >= 1200)
 		mappedOutput = 0;
     else
-    	mappedOutput = a - 70;
+    	mappedOutput = a - 700;
 	return mappedOutput;
 }
 
