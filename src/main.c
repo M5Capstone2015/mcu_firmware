@@ -232,29 +232,65 @@ int lookup(int r_value) {
 
 }
 
-int find_bpm(uint32_t *buffer, int deriv, int index) {
-	int j, cnt = 0;
-	// This means that the previous derivative was positve and we should look for a peak
-	if(deriv == 0) {
-		for(j = 0; j < 5; j++) {
-			if(buffer[index-(j+1)] < buffer[index-j]) {
-				cnt++;
+int find_bpm(uint32_t *buffer, int index, struct Beats *b) {
+
+	uint32_t cur_r, prev_r;
+	if(index == 0) {
+		// We need to wrap around
+		prev_r = buffer[WINDOW_SIZE-1];
+	} else {
+		prev_r = buffer[index-1];
+	}
+	cur_r = buffer[index];
+
+	// If this is a zero crossing then this could be a beat (we only care about maximums)
+	if((prev_r >= 0) && (cur_r < 0)) {
+
+		// We only care about the magnitude of a peak
+		b->peaks[b->p_index] = cur_r;
+		b->peak_index[b->p_index] = index;
+		int prev_p_index, sprev_p_index;
+		if(b->p_index == 0) {
+			prev_p_index = 2;
+			sprev_p_index = 1;
+		}
+		if(b->p_index == 1) {
+			prev_p_index = 0;
+			sprev_p_index = 2;
+		}
+		if(b->p_index == 2) {
+			prev_p_index = 1;
+			sprev_p_index = 0;
+		}
+
+
+		// We verify a peak as a heart beat by confirming that it is greater than the peak
+		// before and after it. So we can't verify a peak until we have a new peak. So lets
+		// verify the previous peak
+
+		if((b->peaks[prev_p_index] > b->peaks[b->p_index]) && (b->peaks[prev_p_index] > b->peaks[sprev_p_index])) {
+			// This means the previous peak is a heart beat!
+			// Need to calculate the number of samples taken between beats
+			int new_beat_index = b->peak_index[prev_p_index];
+			if(b->prev_beat_index > new_beat_index) {
+				// This means we wrapped around. Note that we are a assuming the buffer will not wrap around
+				// more than once in one heart beat
+				b->samples_between_beat = (WINDOW_SIZE - b->prev_beat_index) + new_beat_index;
+			} else {
+				b->samples_between_beat = new_beat_index - b->prev_beat_index;
 			}
 		}
 
-		if(cnt == 4) { return -1; }
+		// Now let's increment the p_index
+		if(b->p_index == 2) {
+			b->p_index = 0;
+		} else{
+			b->p_index++;
+		}
+
 	}
 
-	// This means the slope is decreasing
-	if(deriv == -1) {
-		for(j = 0; j < 5; j++) {
-			if(buffer[index-(j+1)] < buffer[index-j]) {
-				cnt++;
-			}
-		}
-		if(cnt == 4) { return 0; }
-	}
-	return deriv;
+
 }
 void add_to_buffer(uint32_t  *buffer, uint32_t  val, int i, int or12) {
 		if(or12 == 1) {
@@ -409,7 +445,7 @@ int main(void)
   uint32_t tmp[3] = {0};
   int i = 0, new_deriv;
   int index = 0, bpm_index = 0, samples = 0;
-  int deriv = 0, sum;
+  int deriv = 0, sum, bpm;
   uint32_t r_value;
   while (1)
   {
@@ -472,27 +508,16 @@ int main(void)
 	  		ave_r_value[index] = (1000 * sum) / 100;
 
 
+
+//	  		bpm = find_bpm(r_value_buffer,index);
+
+
 	  		if(index >= WINDOW_SIZE) {
 	  			index = 0;
 	  		} else {
 	  			index++;
 	  		}
 
-/*	  		new_deriv = find_bpm(led2_ac_buffer, deriv, index);
-	  		if((deriv == 0) && (new_deriv == -1)) {
-	  			bpm_buffer[bpm_index] = samples;
-	  			samples = 0;
-	  			if(bpm_index >= WINDOW_SIZE) {
-	  				bpm_index = 0;
-	  			} else {
-	  				bpm_index++;
-	  			}
-
-	  		} else {
-	  			samples++;
-	  		}
-	  		deriv = new_deriv;
-*/
 //	  		spo2_mean = calculate_mean(r_value_buffer,WINDOW_SIZE);
 //	  		spo2_calibrated = (1000000 - 25*spo2_mean)/1000;
 //	  		for (int i = 0; i <30;i++){

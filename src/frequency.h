@@ -17,6 +17,15 @@ int byte_array[8];
 
 int mapped_buffer[100];
 int mappedIndex = 0;
+
+struct Beats {
+	uint32_t 	peaks[3];
+	int			peak_index[3];
+	int 		prev_beat_index;
+	int 		samples_between_beat;
+	int			p_index;
+
+};
 /**************************************************************************//**
  * @brief Toggles io with a set delay time a number of times
  * @param delayTime - delay times in Milliseconds (period will be twice this number), repetitions
