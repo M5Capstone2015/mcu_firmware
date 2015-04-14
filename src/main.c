@@ -56,6 +56,7 @@ uint32_t  led2_ac_buffer[WINDOW_SIZE];
 uint32_t  r_value_buffer[WINDOW_SIZE];
 uint32_t  ave_r_value[WINDOW_SIZE];
 uint32_t  bpm_buffer[WINDOW_SIZE];
+char	  is_peak[WINDOW_SIZE];
 int spo2_calibrated = 0;
 
 uint32_t  spo2 = 1;
@@ -235,6 +236,7 @@ int lookup(int r_value) {
 int find_bpm(uint32_t *buffer, int index, struct Beats *b) {
 
 	uint32_t cur_r, prev_r, sprev_r;
+	int status = -1;
 	if(index == 0) {
 		// We need to wrap around
 		prev_r = buffer[WINDOW_SIZE-1];
@@ -248,16 +250,20 @@ int find_bpm(uint32_t *buffer, int index, struct Beats *b) {
 	sprev_r = buffer[index-2];
 	cur_r = buffer[index];
 
+
+	is_peak[index] = 0;
 	// If this is a zero crossing then this could be a beat (we only care about maximums)
 	int prev_deriv, cur_deriv;
 	prev_deriv = prev_r - sprev_r;
 	cur_deriv = cur_r - prev_r;
+	int prev_p_index, sprev_p_index;
 	if((prev_deriv >= 0) && (cur_deriv < 0)) {
 
+		is_peak[index] = 1;
 		// We only care about the magnitude of a peak
 		b->peaks[b->p_index] = cur_r;
 		b->peak_index[b->p_index] = index;
-		int prev_p_index, sprev_p_index;
+
 		if(b->p_index == 0) {
 			prev_p_index = 2;
 			sprev_p_index = 1;
@@ -279,14 +285,32 @@ int find_bpm(uint32_t *buffer, int index, struct Beats *b) {
 		if((b->peaks[prev_p_index] > b->peaks[b->p_index]) && (b->peaks[prev_p_index] > b->peaks[sprev_p_index])) {
 			// This means the previous peak is a heart beat!
 			// Need to calculate the number of samples taken between beats
-			int new_beat_index = b->peak_index[prev_p_index];
-			if(b->prev_beat_index > new_beat_index) {
+//			int new_beat_index = b->peak_index[prev_p_index];
+			if(b->prev_beat_index > b->peak_index[prev_p_index]) {
 				// This means we wrapped around. Note that we are a assuming the buffer will not wrap around
 				// more than once in one heart beat
-				b->samples_between_beat = (WINDOW_SIZE - b->prev_beat_index) + new_beat_index;
+				// We need to make sure that this isn't too close to another peak
+				int samp = (WINDOW_SIZE - b->prev_beat_index) + b->peak_index[prev_p_index];
+				if(samp > 10) {
+					b->samples_between_beat = samp;
+					status = 0;
+					// Let's just do this right now for debugging
+					bpm_buffer[b->peak_index[prev_p_index]] = b->peaks[prev_p_index];
+				}
 			} else {
-				b->samples_between_beat = new_beat_index - b->prev_beat_index;
+				int samp = b->peak_index[prev_p_index] - b->prev_beat_index;
+				if(samp > 10) {
+					b->samples_between_beat = samp;
+					status = 0;
+					// Let's just do this right now for debugging
+					bpm_buffer[b->peak_index[prev_p_index]] = b->peaks[prev_p_index];
+				}
+
 			}
+
+			b->prev_beat_index = b->peak_index[prev_p_index];
+
+
 		}
 
 		// Now let's increment the p_index
@@ -295,10 +319,9 @@ int find_bpm(uint32_t *buffer, int index, struct Beats *b) {
 		} else{
 			b->p_index++;
 		}
-		return 0;
 	}
-
-	return -1;
+	bpm_buffer[index] = 0;
+	return status;
 }
 void add_to_buffer(uint32_t  *buffer, uint32_t  val, int i, int or12) {
 		if(or12 == 1) {
@@ -451,9 +474,14 @@ int main(void)
   // Infinite blink loop
   spo2 = 965;
   uint32_t tmp[3] = {0};
-  int i = 0, new_deriv;
-  int index = 0, bpm_index = 0, samples = 0;
-  int deriv = 0, sum, bpm;
+  int i = 0;
+  int new_deriv;
+  int index = 0;
+  int sum;
+  int bpm_index = 0;
+  int samples = 0;
+  int deriv = 0;
+  int bpm;
   uint32_t r_value;
 
   // Init some values for beats
@@ -461,6 +489,11 @@ int main(void)
   b.prev_beat_index = 0;
   b.p_index = 0;
   b.bpm = 70;
+  b.samples_between_beat = 0;
+  for(i = 0; i < 3; i++) {
+	  b.peaks[i] = 0;
+	  b.peak_index[i] = 0;
+  }
   while (1)
   {
 
@@ -522,7 +555,8 @@ int main(void)
 	  		ave_r_value[index] = (1000 * sum) / 100;
 
 
-
+	  		}
+	  	 /*
 	  		if(find_bpm(ave_r_value, index, &b) == 0) {
 	  			// Add to buffer
 	  			bpm_buffer[bpm_index] = b.samples_between_beat;
@@ -530,9 +564,9 @@ int main(void)
 	  			else { bpm_index++; }
 	  		}
 
+*/
 
-
-	  		if(index >= WINDOW_SIZE) {
+	  		if(index >= 100) {
 	  			index = 0;
 	  		} else {
 	  			index++;
