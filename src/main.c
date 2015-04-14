@@ -234,17 +234,25 @@ int lookup(int r_value) {
 
 int find_bpm(uint32_t *buffer, int index, struct Beats *b) {
 
-	uint32_t cur_r, prev_r;
+	uint32_t cur_r, prev_r, sprev_r;
 	if(index == 0) {
 		// We need to wrap around
 		prev_r = buffer[WINDOW_SIZE-1];
-	} else {
-		prev_r = buffer[index-1];
+		sprev_r = buffer[WINDOW_SIZE-2];
 	}
+	else if(index == 1) {
+		prev_r = buffer[index-1];
+		sprev_r = buffer[WINDOW_SIZE-1];
+	}
+	prev_r = buffer[index-1];
+	sprev_r = buffer[index-2];
 	cur_r = buffer[index];
 
 	// If this is a zero crossing then this could be a beat (we only care about maximums)
-	if((prev_r >= 0) && (cur_r < 0)) {
+	int prev_deriv, cur_deriv;
+	prev_deriv = prev_r - sprev_r;
+	cur_deriv = cur_r - prev_r;
+	if((prev_deriv >= 0) && (cur_deriv < 0)) {
 
 		// We only care about the magnitude of a peak
 		b->peaks[b->p_index] = cur_r;
@@ -287,10 +295,10 @@ int find_bpm(uint32_t *buffer, int index, struct Beats *b) {
 		} else{
 			b->p_index++;
 		}
-
+		return 0;
 	}
 
-
+	return -1;
 }
 void add_to_buffer(uint32_t  *buffer, uint32_t  val, int i, int or12) {
 		if(or12 == 1) {
@@ -447,6 +455,12 @@ int main(void)
   int index = 0, bpm_index = 0, samples = 0;
   int deriv = 0, sum, bpm;
   uint32_t r_value;
+
+  // Init some values for beats
+  struct Beats b;
+  b.prev_beat_index = 0;
+  b.p_index = 0;
+  b.bpm = 70;
   while (1)
   {
 
@@ -500,7 +514,7 @@ int main(void)
 	  		sum = 0;
 	  		for(i = 0; i < 10; i++) {
 	  			if((index-i) < 0) {
-	  				sum += r_value_buffer[WINDOW_SIZE-i];
+	  				sum += r_value_buffer[WINDOW_SIZE-i-1];
 	  			} else {
 	  				sum += r_value_buffer[index-i];
 	  			}
@@ -509,7 +523,13 @@ int main(void)
 
 
 
-//	  		bpm = find_bpm(r_value_buffer,index);
+	  		if(find_bpm(ave_r_value, index, &b) == 0) {
+	  			// Add to buffer
+	  			bpm_buffer[bpm_index] = b.samples_between_beat;
+	  			if(bpm_index >= WINDOW_SIZE) { bpm_index = 0; }
+	  			else { bpm_index++; }
+	  		}
+
 
 
 	  		if(index >= WINDOW_SIZE) {

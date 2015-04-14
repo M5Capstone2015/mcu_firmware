@@ -24,7 +24,7 @@ struct Beats {
 	int 		prev_beat_index;
 	int 		samples_between_beat;
 	int			p_index;
-
+	int			bpm;
 };
 /**************************************************************************//**
  * @brief Toggles io with a set delay time a number of times
