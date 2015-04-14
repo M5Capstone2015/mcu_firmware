@@ -96,7 +96,11 @@ void send_byte(uint32_t byte, int type)
 	entered_send_byte++;
 	int i, temp;
 	send_bit(2);
-	mappedByte = mappingFunction(byte);
+	if (byte <= 700 || byte >= 1200)
+		mappedByte = 0;
+	else
+	  	mappedByte = byte - 700;
+	//mappedByte = mappingFunction(byte);
 	mapped_buffer[mappedIndex] = mappedByte;
 	if(mappedIndex >= 99) {
 		mappedIndex = 0;

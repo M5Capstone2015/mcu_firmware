@@ -295,7 +295,7 @@ int find_bpm(uint32_t *buffer, int index, struct Beats *b) {
 					b->samples_between_beat = samp;
 					status = 0;
 					// Let's just do this right now for debugging
-					bpm_buffer[b->peak_index[prev_p_index]] = b->peaks[prev_p_index];
+				//	bpm_buffer[b->peak_index[prev_p_index]] = b->peaks[prev_p_index];
 				}
 			} else {
 				int samp = b->peak_index[prev_p_index] - b->prev_beat_index;
@@ -303,7 +303,7 @@ int find_bpm(uint32_t *buffer, int index, struct Beats *b) {
 					b->samples_between_beat = samp;
 					status = 0;
 					// Let's just do this right now for debugging
-					bpm_buffer[b->peak_index[prev_p_index]] = b->peaks[prev_p_index];
+			//		bpm_buffer[b->peak_index[prev_p_index]] = b->peaks[prev_p_index];
 				}
 
 			}
@@ -320,7 +320,7 @@ int find_bpm(uint32_t *buffer, int index, struct Beats *b) {
 			b->p_index++;
 		}
 	}
-	bpm_buffer[index] = 0;
+//	bpm_buffer[index] = 0;
 	return status;
 }
 void add_to_buffer(uint32_t  *buffer, uint32_t  val, int i, int or12) {
@@ -521,29 +521,15 @@ int main(void)
 	  		 led1_ac |= (tmp[1] << 8);
 	  		 led1_ac |= tmp[2];
 
-
-//	  		if (led1_ac > 10000){
-//	  			send_byte(750);
-//	  			entered_gpio_callback = 0;
-//	  		}
-//	  		else{
-	  		add_to_buffer(led1_ac_buffer, led1_ac, index, 1);
+	  		 add_to_buffer(led1_ac_buffer, led1_ac, index, 1);
 	  		add_to_buffer(led2_ac_buffer, led2_ac, index, 2);
 
-//	  		 led1_ac_buffer[index] = led1_ac;
-//	  		 led2_ac_buffer[index] = led2_ac;
-//	  		max1 = find_max(led1_ac_buffer, WINDOW_SIZE);
 	  		min1 = find_min(led1_ac_buffer, WINDOW_SIZE);
 	  		min2 = find_min(led2_ac_buffer, WINDOW_SIZE);
 
-//Need to calibrate for probe:
-//http://www.mdpi.com/1424-8220/14/4/7420
-//https://www.wpi.edu/Pubs/E-project/Available/E-project-042811-152156/unrestricted/Pulse_Oximeter_Calibrator.pdf
-
-	  		r_value = (1000*(1000*led2_ac/min2)/(1000*led1_ac/min1))/10;
+	  		r_value = (1000*(1000*led2_ac/min2)/(1000*led1_ac/min1))/100;
 	  		r_value_buffer[index] = r_value;
 
-//	  		add_to_buffer(r_value_buffer, r_value, index, 3);
 	  		sum = 0;
 	  		for(i = 0; i < 10; i++) {
 	  			if((index-i) < 0) {
@@ -556,37 +542,27 @@ int main(void)
 
 
 	  		}
-	  	 /*
-	  		if(find_bpm(ave_r_value, index, &b) == 0) {
+
+
+/*	  		if(find_bpm(ave_r_value, index, &b) == 0) {
 	  			// Add to buffer
 	  			bpm_buffer[bpm_index] = b.samples_between_beat;
-	  			if(bpm_index >= WINDOW_SIZE) { bpm_index = 0; }
+	  			if(bpm_index >= (WINDOW_SIZE-1)) { bpm_index = 0; }
 	  			else { bpm_index++; }
 	  		}
-
 */
 
+	  		send_byte(ave_r_value[index], 0);
 	  		if(index >= 100) {
 	  			index = 0;
 	  		} else {
 	  			index++;
 	  		}
 
-//	  		spo2_mean = calculate_mean(r_value_buffer,WINDOW_SIZE);
-//	  		spo2_calibrated = (1000000 - 25*spo2_mean)/1000;
-//	  		for (int i = 0; i <30;i++){
-
-
-
-
-//	  		send_byte(r_value, 0);
-	  		send_byte(r_value, 0);
-//	  		}
 
 	  		 entered_gpio_callback = 0;
 	  		 Delay(15);
 	  	 }
-//	  	 }
 
   }
-}
+
