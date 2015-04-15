@@ -521,27 +521,31 @@ int main(void)
 	  		 led1_ac |= (tmp[1] << 8);
 	  		 led1_ac |= tmp[2];
 
-	  		 add_to_buffer(led1_ac_buffer, led1_ac, index, 1);
-	  		add_to_buffer(led2_ac_buffer, led2_ac, index, 2);
+	  		 if((led1_ac > 10000) || (led2_ac >> 10000)) {
+	  			 send_byte(700, 0);
+	  			 Delay(15);
+	  		 } else {
+	  			 add_to_buffer(led1_ac_buffer, led1_ac, index, 1);
+	  			 add_to_buffer(led2_ac_buffer, led2_ac, index, 2);
 
-	  		min1 = find_min(led1_ac_buffer, WINDOW_SIZE);
-	  		min2 = find_min(led2_ac_buffer, WINDOW_SIZE);
+	  			 min1 = find_min(led1_ac_buffer, WINDOW_SIZE);
+	  			 min2 = find_min(led2_ac_buffer, WINDOW_SIZE);
 
-	  		r_value = (1000*(1000*led2_ac/min2)/(1000*led1_ac/min1))/100;
-	  		r_value_buffer[index] = r_value;
+	  			 r_value = (1000*(1000*led2_ac/min2)/(1000*led1_ac/min1))/100;
+	  			 r_value_buffer[index] = r_value;
 
-	  		sum = 0;
-	  		for(i = 0; i < 10; i++) {
-	  			if((index-i) < 0) {
-	  				sum += r_value_buffer[WINDOW_SIZE-i-1];
-	  			} else {
-	  				sum += r_value_buffer[index-i];
-	  			}
-	  		}
-	  		ave_r_value[index] = (1000 * sum) / 100;
+	  			 sum = 0;
+	  			 for(i = 0; i < 10; i++) {
+	  				 if((index-i) < 0) {
+	  					 sum += r_value_buffer[WINDOW_SIZE-i-1];
+	  				 } else {
+	  					 sum += r_value_buffer[index-i];
+	  				 }
+	  			 }
+	  			 ave_r_value[index] = (1000 * sum) / 100;
 
 
-	  		}
+
 
 
 /*	  		if(find_bpm(ave_r_value, index, &b) == 0) {
@@ -552,17 +556,18 @@ int main(void)
 	  		}
 */
 
-	  		send_byte(ave_r_value[index], 0);
-	  		if(index >= 100) {
-	  			index = 0;
-	  		} else {
-	  			index++;
-	  		}
+	  			 send_byte(ave_r_value[index], 0);
+	  			 if(index >= 100) {
+	  				 index = 0;
+	  			 } else {
+	  				 index++;
+	  			 }
 
-
+	  		 }
 	  		 entered_gpio_callback = 0;
 	  		 Delay(15);
 	  	 }
 
   }
+}
 
